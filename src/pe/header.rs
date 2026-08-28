@@ -6,7 +6,7 @@ use std::io::{self, Read, Seek, SeekFrom};
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct DosHeader {
-    pub e_magic: u16,      // "MZ"
+    pub e_magic: u16, // "MZ"
     pub e_cblp: u16,
     pub e_cp: u16,
     pub e_crlc: u16,
