@@ -32,18 +32,21 @@ Many Windows XP applications were written with the assumption of relatively smal
 
 This value is intended to be used by memory-status APIs (`GlobalMemoryStatus`, `GlobalMemoryStatusEx`, related `NtQuerySystemInformation` queries, etc.) and by the layer’s internal accounting so that applications cannot freely allocate far beyond what would have been realistic on XP-era hardware.
 
+The mapping is already implemented in `src/config.rs` as `reported_xp_memory_mb`.
+
 ---
 
 ## Current State
 
-**Status: Project initialised — very early stage**
+**Status: Early skeleton**
 
-- Repository created and basic README established.
-- No executable code, PE loader, or API stubs have been implemented yet.
-- Project structure, build configuration, and core modules are still to be added.
-- The memory-mapping policy has been defined and will be encoded in configuration once the first memory-related APIs are written.
+- Repository and basic project structure created.
+- `Cargo.toml` and standard Rust `.gitignore` present.
+- `src/main.rs` — minimal entry point that demonstrates the memory policy.
+- `src/config.rs` — contains the host → XP memory mapping function (with unit tests).
+- No PE loader, no API stubs, and no real host memory detection yet.
 
-This is currently a green-field project. Expect rapid early commits that establish the skeleton (Cargo workspace / crate layout, PE parsing foundations, configuration, and the first handful of kernel32 stubs).
+Next planned work: host memory detection, a minimal PE loader, and the first kernel32 memory-status stubs.
 
 ---
 
@@ -51,7 +54,7 @@ This is currently a green-field project. Expect rapid early commits that establi
 
 ```
 src/
-  main.rs / lib.rs          # Entry point / library root
+  main.rs                   # Entry point
   config.rs                 # Host detection + XP-visible limits (including memory policy)
   pe/                       # PE/COFF loading and relocation
   api/
@@ -65,20 +68,26 @@ src/
 
 ---
 
-## Building (once code exists)
+## Building
 
 ```bash
+git clone https://github.com/JereyBeni/xp-layer.git
+cd xp-layer
 cargo build
-cargo run -- [path-to-xp-era-exe]
+cargo run
 ```
 
-Exact command-line interface and feature flags will be documented as they are introduced.
+`cargo run` currently prints a short banner and demonstrates the memory-reporting mapping with example values. Unit tests for the mapping can be run with:
+
+```bash
+cargo test
+```
 
 ---
 
 ## Contributing / Development Notes
 
-The project is in its earliest phase. Contributions of structure, design discussion, and carefully scoped initial implementations (especially PE loading and the first memory-status APIs) are welcome once the skeleton is in place.
+The project is in its earliest phase. Contributions of structure, design discussion, and carefully scoped initial implementations (especially PE loading and the first memory-status APIs) are welcome.
 
 Please keep the focus on XP-era behaviour and on keeping the reported environment intentionally constrained where it aids compatibility.
 
@@ -90,4 +99,4 @@ Licence still to be decided. A permissive open-source licence (MIT or Apache-2.0
 
 ---
 
-*Last updated to reflect project state at initial README expansion.*
+*Last updated after addition of the initial Rust skeleton.*
