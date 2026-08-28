@@ -7,7 +7,7 @@ mod config;
 
 use eframe::egui;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
@@ -147,7 +147,7 @@ impl eframe::App for AppPicker {
 
             ui.add_space(8.0);
             ui.weak(format!(
-                "Memory policy active — applications will see {} MB RAM", 
+                "Memory policy active — applications will see {} MB RAM",
                 self.reported_memory_mb
             ));
         });
