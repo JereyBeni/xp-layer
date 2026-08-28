@@ -10,13 +10,31 @@ This approach is conceptually similar to projects such as Wine, but deliberately
 
 ---
 
-## Goals
+## Goals (current focus)
 
 - Load and execute 32-bit Windows XP-era PE executables and DLLs.
 - Reimplement (or accurately stub) a useful subset of the Win32 API and supporting components that XP applications expect.
 - Preserve XP-era behavioural quirks where they matter for compatibility.
 - Provide a constrained view of system resources (especially memory) so that older applications behave as they would on period-appropriate hardware.
 - Keep the implementation in idiomatic, safe Rust where practical, with clear module boundaries so the project can grow incrementally.
+
+---
+
+## Future Roadmap
+
+After a solid Windows XP baseline is in place, the project intends to expand support in two directions:
+
+### Windows 98 compatibility
+- Support for Windows 98-era (and late Windows 95) applications.
+- Handling of 16-bit components, older PE/NE formats, and the Win9x API surface where it differs from NT-based Windows.
+- Adjusted resource limits and behavioural quirks appropriate to the late-1990s environment.
+
+### Windows 12 compatibility
+- Forward-looking support for applications written against a future Windows 12 API set.
+- Extension of the translation layer to newer Win32 / modern Windows APIs while retaining the same high-level architecture.
+- Optional profiles that present a more contemporary environment (larger address spaces, updated system calls, etc.) alongside the classic XP profile.
+
+These are longer-term goals. The immediate priority remains a usable Windows XP translation layer.
 
 ---
 
@@ -63,7 +81,7 @@ The mapping is already implemented in `src/config.rs` as `reported_xp_memory_mb`
 - TouchHLE-style workflow: drop applications into `apps/`, select, and run.
 - Memory-reporting policy implemented and visible in the UI.
 - `src/config.rs` contains the mapping function with unit tests.
-- Continuous integration builds on both Ubuntu and Windows.
+- Continuous integration builds on both Ubuntu and Windows (and uploads release binaries as artifacts).
 - No PE loader, no real API stubs, and no host-memory detection yet.
 - Selecting "Run" currently shows a status message only.
 
@@ -104,7 +122,7 @@ Unit tests (currently covering the memory mapping):
 cargo test
 ```
 
-CI status: https://github.com/JereyBeni/xp-layer/actions
+CI status and downloadable binaries: https://github.com/JereyBeni/xp-layer/actions
 
 ---
 
@@ -112,7 +130,7 @@ CI status: https://github.com/JereyBeni/xp-layer/actions
 
 The project is in its earliest phase. Contributions of structure, design discussion, and carefully scoped initial implementations (especially PE loading and the first memory-status APIs) are welcome.
 
-Please keep the focus on XP-era behaviour and on keeping the reported environment intentionally constrained where it aids compatibility.
+Please keep the focus on XP-era behaviour for the present, while keeping the architecture open enough for the planned Windows 98 and Windows 12 expansions.
 
 ---
 
@@ -122,4 +140,4 @@ Licence still to be decided. A permissive open-source licence (MIT or Apache-2.0
 
 ---
 
-*Last updated after CI multi-OS support and formatting fix.*
+*Last updated with future roadmap (Windows 98 + Windows 12).*
