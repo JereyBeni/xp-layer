@@ -24,15 +24,15 @@ This approach is conceptually similar to projects such as Wine, but deliberately
 
 After a solid Windows XP baseline is in place, the project intends to expand support in two directions:
 
-### Windows 98 compatibility
-- Support for Windows 98-era (and late Windows 95) applications.
-- Handling of 16-bit components, older PE/NE formats, and the Win9x API surface where it differs from NT-based Windows.
-- Adjusted resource limits and behavioural quirks appropriate to the late-1990s environment.
+### Windows 2000 compatibility
+- Support for Windows 2000-era applications.
+- Coverage of the NT 5.0 API surface and behavioural differences relative to Windows XP.
+- Adjusted resource limits and compatibility quirks appropriate to the Windows 2000 environment.
 
-### Windows 12 compatibility
-- Forward-looking support for applications written against a future Windows 12 API set.
-- Extension of the translation layer to newer Win32 / modern Windows APIs while retaining the same high-level architecture.
-- Optional profiles that present a more contemporary environment (larger address spaces, updated system calls, etc.) alongside the classic XP profile.
+### Windows Vista compatibility
+- Support for Windows Vista-era applications.
+- Extension of the translation layer to cover Vista-specific APIs, security model changes, and related system components.
+- Optional profiles that present a Vista-like environment alongside the classic XP profile.
 
 These are longer-term goals. The immediate priority remains a usable Windows XP translation layer.
 
@@ -130,7 +130,7 @@ CI status and downloadable binaries: https://github.com/JereyBeni/xp-layer/actio
 
 The project is in its earliest phase. Contributions of structure, design discussion, and carefully scoped initial implementations (especially PE loading and the first memory-status APIs) are welcome.
 
-Please keep the focus on XP-era behaviour for the present, while keeping the architecture open enough for the planned Windows 98 and Windows 12 expansions.
+Please keep the focus on XP-era behaviour for the present, while keeping the architecture open enough for the planned Windows 2000 and Windows Vista expansions.
 
 ---
 
@@ -140,4 +140,4 @@ Licence still to be decided. A permissive open-source licence (MIT or Apache-2.0
 
 ---
 
-*Last updated with future roadmap (Windows 98 + Windows 12).*
+*Last updated with corrected future roadmap (Windows 2000 + Windows Vista).*
