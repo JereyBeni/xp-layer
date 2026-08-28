@@ -4,7 +4,7 @@
 
 `xp-layer` is a compatibility layer that aims to run Windows XP-era applications on modern operating systems by translating Win32 and related APIs into equivalent host functionality. It is **not** a full system emulator (it does not emulate x86 hardware or boot a real Windows XP installation). Instead, it focuses on loading PE binaries and providing a sufficient subset of the XP-era API surface.
 
-This approach is conceptually similar to projects such as Wine, but deliberately scoped toward Windows XP behaviour and constraints.
+This approach is conceptually similar to projects such as Wine, but deliberately scoped toward Windows XP behaviour and constraints. The user interface follows a workflow inspired by touchHLE.
 
 ---
 
@@ -15,6 +15,23 @@ This approach is conceptually similar to projects such as Wine, but deliberately
 - Preserve XP-era behavioural quirks where they matter for compatibility.
 - Provide a constrained view of system resources (especially memory) so that older applications behave as they would on period-appropriate hardware.
 - Keep the implementation in idiomatic, safe Rust where practical, with clear module boundaries so the project can grow incrementally.
+
+---
+
+## Usage (Graphical App Picker)
+
+The workflow is intentionally similar to touchHLE:
+
+1. Place Windows XP-era `.exe` files (and any required companion DLLs) into the `apps/` directory.
+2. Run the program:
+   ```bash
+   cargo run
+   ```
+3. A window appears listing every `.exe` found in `apps/`.
+4. Select an application and click **Run selected application**.
+5. The translation layer will start for that binary (currently a placeholder message is shown; PE loading and API translation are still under development).
+
+You can click **Refresh** at any time to rescan the directory.
 
 ---
 
@@ -32,21 +49,22 @@ Many Windows XP applications were written with the assumption of relatively smal
 
 This value is intended to be used by memory-status APIs (`GlobalMemoryStatus`, `GlobalMemoryStatusEx`, related `NtQuerySystemInformation` queries, etc.) and by the layer’s internal accounting so that applications cannot freely allocate far beyond what would have been realistic on XP-era hardware.
 
-The mapping is already implemented in `src/config.rs` as `reported_xp_memory_mb`.
+The mapping is already implemented in `src/config.rs` as `reported_xp_memory_mb` and is shown in the UI status area.
 
 ---
 
 ## Current State
 
-**Status: Early skeleton**
+**Status: Early skeleton + graphical app picker**
 
-- Repository and basic project structure created.
-- `Cargo.toml` and standard Rust `.gitignore` present.
-- `src/main.rs` — minimal entry point that demonstrates the memory policy.
-- `src/config.rs` — contains the host → XP memory mapping function (with unit tests).
-- No PE loader, no API stubs, and no real host memory detection yet.
+- Graphical user interface (egui/eframe) that scans the `apps/` directory and lists `.exe` files.
+- TouchHLE-style workflow: drop applications into `apps/`, select, and run.
+- Memory-reporting policy implemented and visible in the UI.
+- `src/config.rs` contains the mapping function with unit tests.
+- No PE loader, no real API stubs, and no host-memory detection yet.
+- Selecting “Run” currently shows a status message only.
 
-Next planned work: host memory detection, a minimal PE loader, and the first kernel32 memory-status stubs.
+Next planned work: real host memory detection, a minimal PE loader, and the first kernel32 memory-status stubs that feed into the running layer.
 
 ---
 
@@ -54,7 +72,7 @@ Next planned work: host memory detection, a minimal PE loader, and the first ker
 
 ```
 src/
-  main.rs                   # Entry point
+  main.rs                   # GUI entry point + app picker
   config.rs                 # Host detection + XP-visible limits (including memory policy)
   pe/                       # PE/COFF loading and relocation
   api/
@@ -64,6 +82,7 @@ src/
     ntdll/                  # Lower-level NT APIs as needed
   memory/                   # Virtual memory tracking and enforcement of reported limits
   ...
+apps/                       # Place XP-era .exe files here
 ```
 
 ---
@@ -73,11 +92,10 @@ src/
 ```bash
 git clone https://github.com/JereyBeni/xp-layer.git
 cd xp-layer
-cargo build
 cargo run
 ```
 
-`cargo run` currently prints a short banner and demonstrates the memory-reporting mapping with example values. Unit tests for the mapping can be run with:
+Unit tests (currently covering the memory mapping):
 
 ```bash
 cargo test
@@ -99,4 +117,4 @@ Licence still to be decided. A permissive open-source licence (MIT or Apache-2.0
 
 ---
 
-*Last updated after addition of the initial Rust skeleton.*
+*Last updated after addition of the graphical app picker.*
