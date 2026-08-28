@@ -8,7 +8,8 @@ repository = "https://github.com/JereyBeni/xp-layer"
 readme = "README.md"
 
 [dependencies]
-# To be added as needed (e.g. pe parsing, logging, sysinfo for host memory detection)
+eframe = "0.29"
+egui = "0.29"
 
 [profile.release]
 lto = true
