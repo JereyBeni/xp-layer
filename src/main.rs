@@ -3,11 +3,15 @@
 //! Graphical app picker modelled on touchHLE:
 //! place `.exe` files in the `apps/` directory, then select and run them.
 
+mod api;
 mod config;
 
 use eframe::egui;
 use std::fs;
 use std::path::PathBuf;
+
+use api::kernel32;
+use config::LayerConfig;
 
 fn load_icon() -> Option<egui::IconData> {
     let path = PathBuf::from("assets/logo.png");
@@ -17,7 +21,7 @@ fn load_icon() -> Option<egui::IconData> {
 
 fn main() -> eframe::Result<()> {
     let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([480.0, 420.0])
+        .with_inner_size([520.0, 460.0])
         .with_title("xp-layer - Windows XP Compatibility Layer");
 
     if let Some(icon) = load_icon() {
@@ -41,19 +45,19 @@ struct AppPicker {
     apps: Vec<PathBuf>,
     selected: Option<usize>,
     status: String,
-    reported_memory_mb: u64,
+    config: LayerConfig,
 }
 
 impl AppPicker {
     fn new() -> Self {
         let apps_dir = PathBuf::from("apps");
+        let config = LayerConfig::detect();
         let mut picker = Self {
             apps_dir,
             apps: Vec::new(),
             selected: None,
             status: String::from("Place .exe files in the apps/ directory, then click Refresh."),
-            // Placeholder until real host detection is added
-            reported_memory_mb: config::reported_xp_memory_mb(8 * 1024),
+            config,
         };
         picker.refresh_apps();
         picker
@@ -95,11 +99,21 @@ impl AppPicker {
             return;
         };
         let path = &self.apps[idx];
-        // Placeholder: later this will load the PE and start the translation layer.
+
+        // Demonstrate the memory-status API that guest applications will see.
+        let mem = kernel32::global_memory_status_ex(&self.config);
+
         self.status = format!(
-            "Starting translation layer for:\n{}\n\n(Reported XP memory: {} MB)\n\nPE loading and API translation are not yet implemented.",
+            "Starting translation layer for:\n{}\n\n\
+GlobalMemoryStatusEx (as seen by XP apps):\n\
+  TotalPhys : {} MB\n\
+  AvailPhys : {} MB\n\
+  MemoryLoad: {}%\n\n\
+PE loading and further API translation are not yet implemented.",
             path.display(),
-            self.reported_memory_mb
+            mem.total_phys / (1024 * 1024),
+            mem.avail_phys / (1024 * 1024),
+            mem.memory_load
         );
     }
 }
@@ -159,8 +173,8 @@ impl eframe::App for AppPicker {
 
             ui.add_space(8.0);
             ui.weak(format!(
-                "Memory policy active - applications will see {} MB RAM",
-                self.reported_memory_mb
+                "Host: {} MB  |  Reported to XP apps: {} MB",
+                self.config.host_memory_mb, self.config.reported_memory_mb
             ));
         });
     }
