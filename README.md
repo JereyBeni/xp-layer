@@ -51,7 +51,7 @@ The workflow is intentionally similar to touchHLE:
    ```
 3. A window appears listing every `.exe` found in `apps/`.
 4. Select an application and click **Run selected application**.
-5. The translation layer will start for that binary (currently a placeholder message is shown; PE loading and API translation are still under development).
+5. The translation layer prepares the environment for that binary. Currently it demonstrates the memory-status APIs that guest applications will see.
 
 You can click **Refresh** at any time to rescan the directory.
 
@@ -69,25 +69,28 @@ Many Windows XP applications were written with the assumption of relatively smal
 | 2 GB     | 512 MB                     |
 | 1 GB     | 128 MB                     |
 
-This value is intended to be used by memory-status APIs (`GlobalMemoryStatus`, `GlobalMemoryStatusEx`, related `NtQuerySystemInformation` queries, etc.) and by the layer's internal accounting so that applications cannot freely allocate far beyond what would have been realistic on XP-era hardware.
+This value is used by the implemented `GlobalMemoryStatus` / `GlobalMemoryStatusEx` stubs and will be used by related queries later.
 
-The mapping is already implemented in `src/config.rs` as `reported_xp_memory_mb` and is shown in the UI status area.
+Host memory is detected at startup via the `sysinfo` crate; the mapping is applied automatically.
 
 ---
 
 ## Current State
 
-**Status: Early skeleton + graphical app picker**
+**Status: Early API surface + graphical app picker**
 
 - Graphical user interface (egui/eframe) that scans the `apps/` directory and lists `.exe` files.
 - TouchHLE-style workflow: drop applications into `apps/`, select, and run.
-- Memory-reporting policy implemented and visible in the UI.
-- `src/config.rs` contains the mapping function with unit tests.
+- Real host memory detection (`sysinfo`).
+- Memory-reporting policy applied automatically.
+- First kernel32 stubs implemented:
+  - `GlobalMemoryStatus`
+  - `GlobalMemoryStatusEx`
+- Selecting "Run" now shows the memory values that an XP application would receive.
 - Continuous integration builds on both Ubuntu and Windows (and uploads release binaries as artifacts).
-- No PE loader, no real API stubs, and no host-memory detection yet.
-- Selecting "Run" currently shows a status message only.
+- PE loader and further API coverage still to be added.
 
-Next planned work: real host memory detection, a minimal PE loader, and the first kernel32 memory-status stubs that feed into the running layer.
+Next planned work: minimal PE loader (DOS + PE headers, section mapping) and additional kernel32 stubs.
 
 ---
 
@@ -106,6 +109,7 @@ src/
   memory/                   # Virtual memory tracking and enforcement of reported limits
   ...
 apps/                       # Place XP-era .exe files here
+assets/                     # logo.png used as window icon
 ```
 
 ---
@@ -118,7 +122,7 @@ cd xp-layer
 cargo run
 ```
 
-Unit tests (currently covering the memory mapping):
+Unit tests:
 
 ```bash
 cargo test
@@ -130,7 +134,7 @@ CI status and downloadable binaries: https://github.com/JereyBeni/xp-layer/actio
 
 ## Contributing / Development Notes
 
-The project is in its earliest phase. Contributions of structure, design discussion, and carefully scoped initial implementations (especially PE loading and the first memory-status APIs) are welcome.
+The project is in its earliest phase. Contributions of structure, design discussion, and carefully scoped initial implementations (especially PE loading and further API stubs) are welcome.
 
 Please keep the focus on XP-era behaviour for the present, while keeping the architecture open enough for the planned Windows 2000 and Windows Vista expansions.
 
@@ -142,4 +146,4 @@ Licence still to be decided. A permissive open-source licence (MIT or Apache-2.0
 
 ---
 
-*Last updated with corrected credit (Repo made by Jeremiah, Assistant is Grok).*
+*Last updated after first kernel32 memory-status API stubs.*
