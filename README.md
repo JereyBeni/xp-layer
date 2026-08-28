@@ -2,6 +2,8 @@
 
 **Windows XP API translation / compatibility layer written in Rust**
 
+*(Repo made by Jeremaih, Assistant is Grok)*
+
 `xp-layer` is a compatibility layer that aims to run Windows XP-era applications on modern operating systems by translating Win32 and related APIs into equivalent host functionality. It is **not** a full system emulator (it does not emulate x86 hardware or boot a real Windows XP installation). Instead, it focuses on loading PE binaries and providing a sufficient subset of the XP-era API surface.
 
 This approach is conceptually similar to projects such as Wine, but deliberately scoped toward Windows XP behaviour and constraints. The user interface follows a workflow inspired by touchHLE.
@@ -140,4 +142,4 @@ Licence still to be decided. A permissive open-source licence (MIT or Apache-2.0
 
 ---
 
-*Last updated with corrected future roadmap (Windows 2000 + Windows Vista).*
+*Last updated with credit line (Repo made by Jeremaih, Assistant is Grok).*
