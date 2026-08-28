@@ -9,11 +9,23 @@ use eframe::egui;
 use std::fs;
 use std::path::PathBuf;
 
+fn load_icon() -> Option<egui::IconData> {
+    let path = PathBuf::from("assets/logo.png");
+    let bytes = fs::read(&path).ok()?;
+    eframe::icon_data::from_png_bytes(&bytes).ok()
+}
+
 fn main() -> eframe::Result<()> {
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size([480.0, 420.0])
+        .with_title("xp-layer - Windows XP Compatibility Layer");
+
+    if let Some(icon) = load_icon() {
+        viewport = viewport.with_icon(icon);
+    }
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([480.0, 420.0])
-            .with_title("xp-layer - Windows XP Compatibility Layer"),
+        viewport,
         ..Default::default()
     };
 
