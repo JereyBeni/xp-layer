@@ -11,7 +11,28 @@ use std::fs;
 use std::path::PathBuf;
 
 use api::kernel32;
-use config::LayerConfig;
+use config::{reported_xp_memory_mb, LayerConfig};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Profile {
+    WindowsXp,
+    Windows2000,
+    WindowsVista,
+}
+
+impl Profile {
+    fn label(self) -> &'static str {
+        match self {
+            Profile::WindowsXp => "Windows XP",
+            Profile::Windows2000 => "Windows 2000 (not yet implemented)",
+            Profile::WindowsVista => "Windows Vista (not yet implemented)",
+        }
+    }
+
+    fn is_available(self) -> bool {
+        matches!(self, Profile::WindowsXp)
+    }
+}
 
 fn load_icon() -> Option<egui::IconData> {
     let path = PathBuf::from("assets/logo.png");
@@ -21,7 +42,7 @@ fn load_icon() -> Option<egui::IconData> {
 
 fn main() -> eframe::Result<()> {
     let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([520.0, 460.0])
+        .with_inner_size([560.0, 620.0])
         .with_title("xp-layer - Windows XP Compatibility Layer");
 
     if let Some(icon) = load_icon() {
@@ -42,10 +63,19 @@ fn main() -> eframe::Result<()> {
 
 struct AppPicker {
     apps_dir: PathBuf,
+    apps_dir_input: String,
     apps: Vec<PathBuf>,
     selected: Option<usize>,
     status: String,
     config: LayerConfig,
+
+    // Options
+    show_options: bool,
+    profile: Profile,
+    memory_override_enabled: bool,
+    memory_override_mb: u64,
+    fullscreen: bool,
+    debug_logging: bool,
 }
 
 impl AppPicker {
@@ -53,19 +83,44 @@ impl AppPicker {
         let apps_dir = PathBuf::from("apps");
         let config = LayerConfig::detect();
         let mut picker = Self {
+            apps_dir_input: apps_dir.display().to_string(),
             apps_dir,
             apps: Vec::new(),
             selected: None,
             status: String::from("Place .exe files in the apps/ directory, then click Refresh."),
             config,
+            show_options: false,
+            profile: Profile::WindowsXp,
+            memory_override_enabled: false,
+            memory_override_mb: 512,
+            fullscreen: false,
+            debug_logging: false,
         };
         picker.refresh_apps();
         picker
     }
 
+    fn effective_reported_mb(&self) -> u64 {
+        if self.memory_override_enabled {
+            self.memory_override_mb.max(64)
+        } else {
+            self.config.reported_memory_mb
+        }
+    }
+
+    fn effective_config(&self) -> LayerConfig {
+        LayerConfig {
+            host_memory_mb: self.config.host_memory_mb,
+            reported_memory_mb: self.effective_reported_mb(),
+        }
+    }
+
     fn refresh_apps(&mut self) {
         self.apps.clear();
         self.selected = None;
+
+        let path = PathBuf::from(self.apps_dir_input.trim());
+        self.apps_dir = path;
 
         if !self.apps_dir.exists() {
             let _ = fs::create_dir_all(&self.apps_dir);
@@ -94,49 +149,147 @@ impl AppPicker {
     }
 
     fn run_selected(&mut self) {
+        if !self.profile.is_available() {
+            self.status = format!(
+                "WARNING: The selected profile ({}) is not implemented yet.\n\
+Only the Windows XP profile is available at this time.\n\
+Please switch back to Windows XP in Options.",
+                self.profile.label()
+            );
+            return;
+        }
+
         let Some(idx) = self.selected else {
             self.status = "No application selected.".into();
             return;
         };
         let path = &self.apps[idx];
+        let cfg = self.effective_config();
+        let mem = kernel32::global_memory_status_ex(&cfg);
 
-        // Demonstrate the memory-status API that guest applications will see.
-        let mem = kernel32::global_memory_status_ex(&self.config);
-
-        self.status = format!(
+        let mut msg = format!(
             "Starting translation layer for:\n{}\n\n\
-GlobalMemoryStatusEx (as seen by XP apps):\n\
+Profile: {}\n\
+GlobalMemoryStatusEx (as seen by guest apps):\n\
   TotalPhys : {} MB\n\
   AvailPhys : {} MB\n\
-  MemoryLoad: {}%\n\n\
-PE loading and further API translation are not yet implemented.",
+  MemoryLoad: {}%\n",
             path.display(),
+            self.profile.label(),
             mem.total_phys / (1024 * 1024),
             mem.avail_phys / (1024 * 1024),
             mem.memory_load
         );
+
+        if self.debug_logging {
+            msg.push_str(&format!(
+                "\n[Debug] Host memory: {} MB | Override active: {}\n",
+                self.config.host_memory_mb, self.memory_override_enabled
+            ));
+        }
+
+        msg.push_str("\nPE loading and further API translation are not yet implemented.");
+        self.status = msg;
     }
 }
 
 impl eframe::App for AppPicker {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Apply fullscreen request
+        ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(self.fullscreen));
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("xp-layer");
-            ui.label("Windows XP compatibility layer (early skeleton)");
+            ui.label("Windows XP compatibility layer");
             ui.separator();
 
+            // Top bar
             ui.horizontal(|ui| {
                 if ui.button("Refresh").clicked() {
                     self.refresh_apps();
                 }
-                ui.label(format!("Apps directory: {}", self.apps_dir.display()));
+                if ui
+                    .button(if self.show_options {
+                        "Hide Options"
+                    } else {
+                        "Options"
+                    })
+                    .clicked()
+                {
+                    self.show_options = !self.show_options;
+                }
             });
 
-            ui.add_space(8.0);
+            // Options panel
+            if self.show_options {
+                ui.add_space(6.0);
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    ui.heading("Options");
+
+                    // Profile
+                    ui.label("Compatibility profile:");
+                    ui.horizontal(|ui| {
+                        for p in [Profile::WindowsXp, Profile::Windows2000, Profile::WindowsVista] {
+                            ui.radio_value(&mut self.profile, p, p.label());
+                        }
+                    });
+                    if !self.profile.is_available() {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(220, 80, 60),
+                            "WARNING: Windows 2000 and Windows Vista profiles are not implemented yet. Only Windows XP is available.",
+                        );
+                    }
+
+                    ui.add_space(6.0);
+                    ui.separator();
+
+                    // Memory override
+                    ui.checkbox(
+                        &mut self.memory_override_enabled,
+                        "Override reported memory",
+                    );
+                    if self.memory_override_enabled {
+                        ui.horizontal(|ui| {
+                            ui.label("Reported memory (MB):");
+                            ui.add(
+                                egui::DragValue::new(&mut self.memory_override_mb)
+                                    .range(64..=4096)
+                                    .speed(16.0),
+                            );
+                        });
+                        ui.weak(format!(
+                            "Automatic mapping would report {} MB",
+                            reported_xp_memory_mb(self.config.host_memory_mb)
+                        ));
+                    }
+
+                    ui.add_space(4.0);
+
+                    // Apps directory
+                    ui.label("Apps directory:");
+                    ui.horizontal(|ui| {
+                        ui.text_edit_singleline(&mut self.apps_dir_input);
+                        if ui.button("Apply").clicked() {
+                            self.refresh_apps();
+                        }
+                    });
+
+                    ui.add_space(4.0);
+
+                    // Window
+                    ui.checkbox(&mut self.fullscreen, "Fullscreen");
+
+                    // Debug
+                    ui.checkbox(&mut self.debug_logging, "Debug logging (extra status detail)");
+                });
+                ui.add_space(6.0);
+            }
+
+            ui.separator();
             ui.label("Applications:");
 
             egui::ScrollArea::vertical()
-                .max_height(180.0)
+                .max_height(160.0)
                 .show(ui, |ui| {
                     if self.apps.is_empty() {
                         ui.label("(no .exe files found)");
@@ -166,15 +319,17 @@ impl eframe::App for AppPicker {
                 }
             });
 
-            ui.add_space(12.0);
+            ui.add_space(10.0);
             ui.separator();
             ui.label("Status:");
             ui.label(&self.status);
 
-            ui.add_space(8.0);
+            ui.add_space(6.0);
             ui.weak(format!(
-                "Host: {} MB  |  Reported to XP apps: {} MB",
-                self.config.host_memory_mb, self.config.reported_memory_mb
+                "Host: {} MB  |  Reported to guest: {} MB  |  Profile: {}",
+                self.config.host_memory_mb,
+                self.effective_reported_mb(),
+                self.profile.label()
             ));
         });
     }
