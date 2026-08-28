@@ -1,4 +1,4 @@
-//! xp-layer — Windows XP API translation / compatibility layer
+//! xp-layer - Windows XP API translation / compatibility layer
 //!
 //! Graphical app picker modelled on touchHLE:
 //! place `.exe` files in the `apps/` directory, then select and run them.
@@ -13,7 +13,7 @@ fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([480.0, 420.0])
-            .with_title("xp-layer — Windows XP Compatibility Layer"),
+            .with_title("xp-layer - Windows XP Compatibility Layer"),
         ..Default::default()
     };
 
@@ -147,7 +147,7 @@ impl eframe::App for AppPicker {
 
             ui.add_space(8.0);
             ui.weak(format!(
-                "Memory policy active — applications will see {} MB RAM",
+                "Memory policy active - applications will see {} MB RAM",
                 self.reported_memory_mb
             ));
         });
