@@ -50,8 +50,27 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Build
+      - name: Build (debug)
         run: cargo build --verbose
 
       - name: Run tests
         run: cargo test --verbose
+
+      - name: Build (release)
+        run: cargo build --release --verbose
+
+      - name: Upload Windows executable
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xp-layer-windows
+          path: target/release/xp-layer.exe
+          if-no-files-found: error
+
+      - name: Upload Linux binary
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xp-layer-linux
+          path: target/release/xp-layer
+          if-no-files-found: error
