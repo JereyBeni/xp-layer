@@ -1,0 +1,15 @@
+[package]
+name = "xp-layer"
+version = "0.1.0"
+edition = "2021"
+description = "Windows XP API translation / compatibility layer written in Rust"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/JereyBeni/xp-layer"
+readme = "README.md"
+
+[dependencies]
+# To be added as needed (e.g. pe parsing, logging, sysinfo for host memory detection)
+
+[profile.release]
+lto = true
+codegen-units = 1
