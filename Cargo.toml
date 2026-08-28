@@ -11,6 +11,7 @@ readme = "README.md"
 [dependencies]
 eframe = "0.29"
 egui = "0.29"
+sysinfo = "0.32"
 
 [profile.release]
 lto = true
