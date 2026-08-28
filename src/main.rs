@@ -5,6 +5,7 @@
 
 mod api;
 mod config;
+mod pe;
 
 use eframe::egui;
 use std::fs;
@@ -12,6 +13,7 @@ use std::path::PathBuf;
 
 use api::kernel32;
 use config::{reported_xp_memory_mb, LayerConfig};
+use pe::LoadedImage;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Profile {
@@ -42,7 +44,7 @@ fn load_icon() -> Option<egui::IconData> {
 
 fn main() -> eframe::Result<()> {
     let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([560.0, 620.0])
+        .with_inner_size([560.0, 640.0])
         .with_title("xp-layer - Windows XP Compatibility Layer");
 
     if let Some(icon) = load_icon() {
@@ -163,18 +165,30 @@ Please switch back to Windows XP in Options.",
             self.status = "No application selected.".into();
             return;
         };
-        let path = &self.apps[idx];
+        let path = self.apps[idx].clone();
+
+        // 1. Load the PE
+        let loaded = match LoadedImage::load(&path) {
+            Ok(img) => img,
+            Err(e) => {
+                self.status = format!("Failed to load PE:\n{}\n\n{}", path.display(), e);
+                return;
+            }
+        };
+
+        // 2. Show memory status the guest would see
         let cfg = self.effective_config();
         let mem = kernel32::global_memory_status_ex(&cfg);
 
         let mut msg = format!(
-            "Starting translation layer for:\n{}\n\n\
+            "Loaded: {}\n\n{}\n\
 Profile: {}\n\
-GlobalMemoryStatusEx (as seen by guest apps):\n\
+GlobalMemoryStatusEx:\n\
   TotalPhys : {} MB\n\
   AvailPhys : {} MB\n\
   MemoryLoad: {}%\n",
             path.display(),
+            loaded.summary(),
             self.profile.label(),
             mem.total_phys / (1024 * 1024),
             mem.avail_phys / (1024 * 1024),
@@ -188,14 +202,15 @@ GlobalMemoryStatusEx (as seen by guest apps):\n\
             ));
         }
 
-        msg.push_str("\nPE loading and further API translation are not yet implemented.");
+        msg.push_str(
+            "\nPE image is mapped in memory. CPU execution and further API translation are not yet implemented.",
+        );
         self.status = msg;
     }
 }
 
 impl eframe::App for AppPicker {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Apply fullscreen request
         ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(self.fullscreen));
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -203,7 +218,6 @@ impl eframe::App for AppPicker {
             ui.label("Windows XP compatibility layer");
             ui.separator();
 
-            // Top bar
             ui.horizontal(|ui| {
                 if ui.button("Refresh").clicked() {
                     self.refresh_apps();
@@ -220,13 +234,11 @@ impl eframe::App for AppPicker {
                 }
             });
 
-            // Options panel
             if self.show_options {
                 ui.add_space(6.0);
                 egui::Frame::group(ui.style()).show(ui, |ui| {
                     ui.heading("Options");
 
-                    // Profile
                     ui.label("Compatibility profile:");
                     ui.horizontal(|ui| {
                         for p in [Profile::WindowsXp, Profile::Windows2000, Profile::WindowsVista] {
@@ -243,7 +255,6 @@ impl eframe::App for AppPicker {
                     ui.add_space(6.0);
                     ui.separator();
 
-                    // Memory override
                     ui.checkbox(
                         &mut self.memory_override_enabled,
                         "Override reported memory",
@@ -265,7 +276,6 @@ impl eframe::App for AppPicker {
 
                     ui.add_space(4.0);
 
-                    // Apps directory
                     ui.label("Apps directory:");
                     ui.horizontal(|ui| {
                         ui.text_edit_singleline(&mut self.apps_dir_input);
@@ -275,11 +285,7 @@ impl eframe::App for AppPicker {
                     });
 
                     ui.add_space(4.0);
-
-                    // Window
                     ui.checkbox(&mut self.fullscreen, "Fullscreen");
-
-                    // Debug
                     ui.checkbox(&mut self.debug_logging, "Debug logging (extra status detail)");
                 });
                 ui.add_space(6.0);
@@ -289,7 +295,7 @@ impl eframe::App for AppPicker {
             ui.label("Applications:");
 
             egui::ScrollArea::vertical()
-                .max_height(160.0)
+                .max_height(140.0)
                 .show(ui, |ui| {
                     if self.apps.is_empty() {
                         ui.label("(no .exe files found)");
@@ -322,7 +328,11 @@ impl eframe::App for AppPicker {
             ui.add_space(10.0);
             ui.separator();
             ui.label("Status:");
-            ui.label(&self.status);
+            egui::ScrollArea::vertical()
+                .max_height(180.0)
+                .show(ui, |ui| {
+                    ui.label(&self.status);
+                });
 
             ui.add_space(6.0);
             ui.weak(format!(
