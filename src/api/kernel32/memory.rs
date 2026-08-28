@@ -35,6 +35,7 @@ pub struct MemoryStatusEx {
 
 /// GlobalMemoryStatus equivalent.
 /// Fills the structure with the constrained XP-visible memory values.
+#[allow(dead_code)] // kept for API completeness; Ex version is preferred
 pub fn global_memory_status(config: &LayerConfig) -> MemoryStatus {
     let total = (config.reported_memory_mb as usize).saturating_mul(1024 * 1024);
     // Present a modest amount as "in use" so memory_load is non-zero but realistic.
@@ -55,7 +56,7 @@ pub fn global_memory_status(config: &LayerConfig) -> MemoryStatus {
 
 /// GlobalMemoryStatusEx equivalent.
 pub fn global_memory_status_ex(config: &LayerConfig) -> MemoryStatusEx {
-    let total = (config.reported_memory_mb as u64).saturating_mul(1024 * 1024);
+    let total = config.reported_memory_mb.saturating_mul(1024 * 1024);
     let used = total / 8;
     let avail = total.saturating_sub(used);
 
@@ -87,5 +88,15 @@ mod tests {
         assert_eq!(status.total_phys, 2 * 1024 * 1024 * 1024);
         assert!(status.avail_phys <= status.total_phys);
         assert!(status.memory_load <= 100);
+    }
+
+    #[test]
+    fn legacy_status_also_works() {
+        let config = LayerConfig {
+            host_memory_mb: 8 * 1024,
+            reported_memory_mb: 1024,
+        };
+        let status = global_memory_status(&config);
+        assert_eq!(status.total_phys, 1024 * 1024 * 1024);
     }
 }
