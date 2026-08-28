@@ -6,6 +6,8 @@
 
 This approach is conceptually similar to projects such as Wine, but deliberately scoped toward Windows XP behaviour and constraints. The user interface follows a workflow inspired by touchHLE.
 
+**Target platforms:** Windows and Linux. On Linux, future use of KVM (where available) is expected to improve performance of the translation layer compared with a pure software path on Windows.
+
 ---
 
 ## Goals
@@ -47,7 +49,7 @@ Many Windows XP applications were written with the assumption of relatively smal
 | 2 GB     | 512 MB                     |
 | 1 GB     | 128 MB                     |
 
-This value is intended to be used by memory-status APIs (`GlobalMemoryStatus`, `GlobalMemoryStatusEx`, related `NtQuerySystemInformation` queries, etc.) and by the layer’s internal accounting so that applications cannot freely allocate far beyond what would have been realistic on XP-era hardware.
+This value is intended to be used by memory-status APIs (`GlobalMemoryStatus`, `GlobalMemoryStatusEx`, related `NtQuerySystemInformation` queries, etc.) and by the layer's internal accounting so that applications cannot freely allocate far beyond what would have been realistic on XP-era hardware.
 
 The mapping is already implemented in `src/config.rs` as `reported_xp_memory_mb` and is shown in the UI status area.
 
@@ -61,8 +63,9 @@ The mapping is already implemented in `src/config.rs` as `reported_xp_memory_mb`
 - TouchHLE-style workflow: drop applications into `apps/`, select, and run.
 - Memory-reporting policy implemented and visible in the UI.
 - `src/config.rs` contains the mapping function with unit tests.
+- Continuous integration builds on both Ubuntu and Windows.
 - No PE loader, no real API stubs, and no host-memory detection yet.
-- Selecting “Run” currently shows a status message only.
+- Selecting "Run" currently shows a status message only.
 
 Next planned work: real host memory detection, a minimal PE loader, and the first kernel32 memory-status stubs that feed into the running layer.
 
@@ -101,6 +104,8 @@ Unit tests (currently covering the memory mapping):
 cargo test
 ```
 
+CI status: https://github.com/JereyBeni/xp-layer/actions
+
 ---
 
 ## Contributing / Development Notes
@@ -117,4 +122,4 @@ Licence still to be decided. A permissive open-source licence (MIT or Apache-2.0
 
 ---
 
-*Last updated after addition of the graphical app picker.*
+*Last updated after CI multi-OS support and formatting fix.*
