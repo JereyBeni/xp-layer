@@ -5,6 +5,7 @@
 
 mod api;
 mod config;
+mod cpu;
 mod pe;
 
 use eframe::egui;
@@ -13,6 +14,7 @@ use std::path::PathBuf;
 
 use api::kernel32;
 use config::{reported_xp_memory_mb, LayerConfig};
+use cpu::{check_host_cpu, Emulator, HostCpuInfo};
 use pe::LoadedImage;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +73,7 @@ struct AppPicker {
     selected: Option<usize>,
     status: String,
     config: LayerConfig,
+    host_cpu: HostCpuInfo,
 
     // Options
     show_options: bool,
@@ -85,15 +88,24 @@ impl AppPicker {
     fn new() -> Self {
         let apps_dir = PathBuf::from("apps");
         let config = LayerConfig::detect();
+        let host_cpu = check_host_cpu();
+        let cpu_line = format!(
+            "Host CPU: {} | {}\n{}",
+            host_cpu.brand,
+            host_cpu.vendor,
+            host_cpu.status.message()
+        );
         let mut picker = Self {
             apps_dir_input: apps_dir.display().to_string(),
             apps_dir,
             apps: Vec::new(),
             selected: None,
-            status: String::from(
-                "Welcome to xp-layer.\n\nPlace 32-bit Windows XP .exe files in the apps/ folder,\nthen click Refresh and select one to load.",
+            status: format!(
+                "Welcome to xp-layer.\n\n{}\n\nPlace 32-bit Windows XP .exe files in the apps/ folder,\nthen click Refresh and select one to load.",
+                cpu_line
             ),
             config,
+            host_cpu,
             show_options: false,
             profile: Profile::WindowsXp,
             memory_override_enabled: false,
@@ -146,9 +158,11 @@ impl AppPicker {
                 }
                 self.apps.sort();
                 self.status = format!(
-                    "Found {} application(s) in {}.\nSelect one and click Run.",
+                    "Found {} application(s) in {}.\nSelect one and click Run.\n\nHost CPU: {}\n{}",
                     self.apps.len(),
-                    self.apps_dir.display()
+                    self.apps_dir.display(),
+                    self.host_cpu.brand,
+                    self.host_cpu.status.message()
                 );
             }
             Err(e) => {
@@ -158,6 +172,19 @@ impl AppPicker {
     }
 
     fn run_selected(&mut self) {
+        if !self.host_cpu.status.is_ok() {
+            self.status = format!(
+                "CPU CHECK FAILED\n\n{}\nVendor: {}\nBrand: {}\nFamily {} Model {} Stepping {}\n\nExecution is blocked until an accepted Intel host is used.\nAMD support is not included yet.",
+                self.host_cpu.status.message(),
+                self.host_cpu.vendor,
+                self.host_cpu.brand,
+                self.host_cpu.family,
+                self.host_cpu.model,
+                self.host_cpu.stepping
+            );
+            return;
+        }
+
         if !self.profile.is_available() {
             self.status = format!(
                 "WARNING\n\nThe selected profile ({}) is not implemented yet.\nOnly Windows XP is available.\n\nSwitch back to Windows XP in Options.",
@@ -183,25 +210,39 @@ impl AppPicker {
         let cfg = self.effective_config();
         let mem = kernel32::global_memory_status_ex(&cfg);
 
+        // Enter the CPU emulator at the PE entry point (limited steps).
+        let mut emu = Emulator::from_image(&loaded);
+        let report = emu.run(64);
+
         let mut msg = format!(
-            "Loaded: {}\n\n{}\nProfile: {}\n\nGlobalMemoryStatusEx:\n  TotalPhys : {} MB\n  AvailPhys : {} MB\n  MemoryLoad: {}%\n",
+            "Loaded: {}\n\n{}\nProfile: {}\n\nHost CPU: {} ({})\n{}\n\nGlobalMemoryStatusEx:\n  TotalPhys : {} MB\n  AvailPhys : {} MB\n  MemoryLoad: {}%\n\nCPU emulator:\n  Steps      : {}\n  Stopped    : {}\n  EIP        : 0x{:08X}\n  EAX        : 0x{:08X}\n",
             path.display(),
             loaded.summary(),
             self.profile.short_label(),
+            self.host_cpu.brand,
+            self.host_cpu.vendor,
+            self.host_cpu.status.message(),
             mem.total_phys / (1024 * 1024),
             mem.avail_phys / (1024 * 1024),
-            mem.memory_load
+            mem.memory_load,
+            report.steps,
+            report.stopped_reason,
+            report.eip,
+            report.eax
         );
 
         if self.debug_logging {
             msg.push_str(&format!(
-                "\n[Debug] Host: {} MB | Override: {}\n",
-                self.config.host_memory_mb, self.memory_override_enabled
+                "\n[Debug] Host RAM: {} MB | Override: {} | Family {} Model {}\n",
+                self.config.host_memory_mb,
+                self.memory_override_enabled,
+                self.host_cpu.family,
+                self.host_cpu.model
             ));
         }
 
         msg.push_str(
-            "\nPE image mapped. CPU execution and full API translation are not yet implemented.",
+            "\nNote: only a tiny opcode set is implemented so far; real apps will stop on the first unknown instruction.",
         );
         self.status = msg;
     }
@@ -211,11 +252,9 @@ impl eframe::App for AppPicker {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(self.fullscreen));
 
-        // XP-ish blue title bar colours
         let title_blue = egui::Color32::from_rgb(0, 0, 160);
         let accent_magenta = egui::Color32::from_rgb(200, 0, 200);
 
-        // Top header
         egui::TopBottomPanel::top("header")
             .exact_height(48.0)
             .show(ctx, |ui| {
@@ -251,27 +290,31 @@ impl eframe::App for AppPicker {
                 });
             });
 
-        // Bottom status bar
         egui::TopBottomPanel::bottom("footer")
             .exact_height(28.0)
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
                     ui.add_space(8.0);
+                    let cpu_ok = self.host_cpu.status.is_ok();
                     ui.label(
                         egui::RichText::new(format!(
-                            "Host: {} MB  |  Guest sees: {} MB  |  Profile: {}  |  Apps: {}",
+                            "Host: {} MB  |  Guest: {} MB  |  {}  |  CPU: {}  |  Apps: {}",
                             self.config.host_memory_mb,
                             self.effective_reported_mb(),
                             self.profile.short_label(),
+                            if cpu_ok { "Intel OK" } else { "CPU blocked" },
                             self.apps.len()
                         ))
                         .small()
-                        .color(egui::Color32::GRAY),
+                        .color(if cpu_ok {
+                            egui::Color32::GRAY
+                        } else {
+                            egui::Color32::from_rgb(220, 100, 80)
+                        }),
                     );
                 });
             });
 
-        // Options side panel
         if self.show_options {
             egui::SidePanel::right("options")
                 .resizable(true)
@@ -292,6 +335,23 @@ impl eframe::App for AppPicker {
                         ui.colored_label(
                             egui::Color32::from_rgb(220, 80, 60),
                             "Not implemented yet. Only Windows XP works.",
+                        );
+                    }
+
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.label("Host CPU");
+                    ui.monospace(format!("{}", self.host_cpu.brand));
+                    ui.weak(format!(
+                        "{} | family {} model {}",
+                        self.host_cpu.vendor, self.host_cpu.family, self.host_cpu.model
+                    ));
+                    if self.host_cpu.status.is_ok() {
+                        ui.colored_label(egui::Color32::from_rgb(80, 160, 80), "Accepted (Intel)");
+                    } else {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(220, 80, 60),
+                            self.host_cpu.status.message(),
                         );
                     }
 
@@ -332,17 +392,16 @@ impl eframe::App for AppPicker {
                     ui.add_space(12.0);
                     ui.separator();
                     ui.weak("Made for Linux and Windows.");
+                    ui.weak("CPU: Intel 2006+ only (AMD later).");
                 });
         }
 
-        // Main content: apps list + status
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(4.0);
 
             let mut run_after_list = false;
 
             ui.columns(2, |cols| {
-                // Left: application list
                 cols[0].group(|ui| {
                     ui.horizontal(|ui| {
                         ui.heading("Applications");
@@ -415,7 +474,6 @@ impl eframe::App for AppPicker {
                     }
                 });
 
-                // Right: status / PE output
                 cols[1].group(|ui| {
                     ui.heading("Status");
                     ui.separator();
