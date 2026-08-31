@@ -104,6 +104,13 @@ impl FileHeader {
     }
 }
 
+/// IMAGE_DATA_DIRECTORY entry
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DataDirectory {
+    pub virtual_address: u32,
+    pub size: u32,
+}
+
 /// IMAGE_OPTIONAL_HEADER32 (partial, the fields we need)
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -138,6 +145,8 @@ pub struct OptionalHeader32 {
     pub size_of_heap_commit: u32,
     pub loader_flags: u32,
     pub number_of_rva_and_sizes: u32,
+    /// Index 1 = IMAGE_DIRECTORY_ENTRY_IMPORT
+    pub import_directory: DataDirectory,
 }
 
 impl OptionalHeader32 {
@@ -146,6 +155,25 @@ impl OptionalHeader32 {
     pub fn read<R: Read>(r: &mut R) -> io::Result<Self> {
         let mut buf = [0u8; 96]; // up to NumberOfRvaAndSizes
         r.read_exact(&mut buf)?;
+
+        let number_of_rva_and_sizes = u32::from_le_bytes(buf[92..96].try_into().unwrap());
+
+        // Read data directories
+        let mut import_directory = DataDirectory::default();
+        for i in 0..number_of_rva_and_sizes {
+            let mut dir_buf = [0u8; 8];
+            r.read_exact(&mut dir_buf)?;
+            let va = u32::from_le_bytes(dir_buf[0..4].try_into().unwrap());
+            let size = u32::from_le_bytes(dir_buf[4..8].try_into().unwrap());
+            if i == 1 {
+                // IMAGE_DIRECTORY_ENTRY_IMPORT
+                import_directory = DataDirectory {
+                    virtual_address: va,
+                    size,
+                };
+            }
+        }
+
         Ok(Self {
             magic: u16::from_le_bytes(buf[0..2].try_into().unwrap()),
             major_linker_version: buf[2],
@@ -176,7 +204,8 @@ impl OptionalHeader32 {
             size_of_heap_reserve: u32::from_le_bytes(buf[80..84].try_into().unwrap()),
             size_of_heap_commit: u32::from_le_bytes(buf[84..88].try_into().unwrap()),
             loader_flags: u32::from_le_bytes(buf[88..92].try_into().unwrap()),
-            number_of_rva_and_sizes: u32::from_le_bytes(buf[92..96].try_into().unwrap()),
+            number_of_rva_and_sizes,
+            import_directory,
         })
     }
 }
@@ -269,11 +298,6 @@ impl PeInfo {
                 "Only PE32 (32-bit) optional headers are supported",
             ));
         }
-
-        // Skip data directories (8 bytes each)
-        let skip = (optional.number_of_rva_and_sizes as usize).saturating_mul(8);
-        let mut discard = vec![0u8; skip];
-        r.read_exact(&mut discard)?;
 
         let mut sections = Vec::with_capacity(file.number_of_sections as usize);
         for _ in 0..file.number_of_sections {
