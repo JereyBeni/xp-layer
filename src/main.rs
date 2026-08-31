@@ -224,60 +224,60 @@ impl eframe::App for AppPicker {
         let accent_magenta = egui::Color32::from_rgb(200, 0, 200);
 
         // Top header
-        egui::TopBottomPanel::top("header").exact_height(48.0).show(ctx, |ui| {
-            ui.painter().rect_filled(
-                ui.max_rect(),
-                0.0,
-                title_blue,
-            );
-            ui.horizontal_centered(|ui| {
-                ui.add_space(12.0);
-                ui.heading(
-                    egui::RichText::new("xp-layer")
-                        .color(egui::Color32::WHITE)
-                        .strong(),
-                );
-                ui.label(
-                    egui::RichText::new("  Windows XP compatibility layer")
-                        .color(egui::Color32::from_rgb(200, 200, 255))
-                        .small(),
-                );
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        egui::TopBottomPanel::top("header")
+            .exact_height(48.0)
+            .show(ctx, |ui| {
+                ui.painter().rect_filled(ui.max_rect(), 0.0, title_blue);
+                ui.horizontal_centered(|ui| {
                     ui.add_space(12.0);
-                    if ui
-                        .button(if self.show_options {
-                            "Hide Options"
-                        } else {
-                            "Options"
-                        })
-                        .clicked()
-                    {
-                        self.show_options = !self.show_options;
-                    }
-                    if ui.button("Refresh").clicked() {
-                        self.refresh_apps();
-                    }
+                    ui.heading(
+                        egui::RichText::new("xp-layer")
+                            .color(egui::Color32::WHITE)
+                            .strong(),
+                    );
+                    ui.label(
+                        egui::RichText::new("  Windows XP compatibility layer")
+                            .color(egui::Color32::from_rgb(200, 200, 255))
+                            .small(),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(12.0);
+                        if ui
+                            .button(if self.show_options {
+                                "Hide Options"
+                            } else {
+                                "Options"
+                            })
+                            .clicked()
+                        {
+                            self.show_options = !self.show_options;
+                        }
+                        if ui.button("Refresh").clicked() {
+                            self.refresh_apps();
+                        }
+                    });
                 });
             });
-        });
 
         // Bottom status bar
-        egui::TopBottomPanel::bottom("footer").exact_height(28.0).show(ctx, |ui| {
-            ui.horizontal_centered(|ui| {
-                ui.add_space(8.0);
-                ui.label(
-                    egui::RichText::new(format!(
-                        "Host: {} MB  |  Guest sees: {} MB  |  Profile: {}  |  Apps: {}",
-                        self.config.host_memory_mb,
-                        self.effective_reported_mb(),
-                        self.profile.short_label(),
-                        self.apps.len()
-                    ))
-                    .small()
-                    .color(egui::Color32::GRAY),
-                );
+        egui::TopBottomPanel::bottom("footer")
+            .exact_height(28.0)
+            .show(ctx, |ui| {
+                ui.horizontal_centered(|ui| {
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "Host: {} MB  |  Guest sees: {} MB  |  Profile: {}  |  Apps: {}",
+                            self.config.host_memory_mb,
+                            self.effective_reported_mb(),
+                            self.profile.short_label(),
+                            self.apps.len()
+                        ))
+                        .small()
+                        .color(egui::Color32::GRAY),
+                    );
+                });
             });
-        });
 
         // Options side panel
         if self.show_options {
@@ -289,7 +289,11 @@ impl eframe::App for AppPicker {
                     ui.separator();
 
                     ui.label("Compatibility profile");
-                    for p in [Profile::WindowsXp, Profile::Windows2000, Profile::WindowsVista] {
+                    for p in [
+                        Profile::WindowsXp,
+                        Profile::Windows2000,
+                        Profile::WindowsVista,
+                    ] {
                         ui.radio_value(&mut self.profile, p, p.short_label());
                     }
                     if !self.profile.is_available() {
@@ -303,7 +307,10 @@ impl eframe::App for AppPicker {
                     ui.separator();
                     ui.add_space(4.0);
 
-                    ui.checkbox(&mut self.memory_override_enabled, "Override reported memory");
+                    ui.checkbox(
+                        &mut self.memory_override_enabled,
+                        "Override reported memory",
+                    );
                     if self.memory_override_enabled {
                         ui.horizontal(|ui| {
                             ui.label("MB:");
@@ -404,10 +411,7 @@ impl eframe::App for AppPicker {
 
                     if let Some(idx) = self.selected {
                         if let Some(path) = self.apps.get(idx) {
-                            let name = path
-                                .file_name()
-                                .and_then(|n| n.to_str())
-                                .unwrap_or("?");
+                            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
                             ui.label(
                                 egui::RichText::new(format!("Selected: {}", name))
                                     .small()
