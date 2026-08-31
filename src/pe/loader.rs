@@ -74,15 +74,20 @@ impl LoadedImage {
     pub fn summary(&self) -> String {
         let mut s = format!(
             "PE loaded successfully\n\
-  Machine      : i386 (32-bit)\n\
-  ImageBase    : 0x{:08X}\n\
-  EntryPoint   : RVA 0x{:08X}\n\
-  SizeOfImage  : {} bytes\n\
-  Sections     : {}\n",
+  DOS magic   : 0x{:04X}\n\
+  Machine     : 0x{:04X} (i386)\n\
+  Sections    : {}\n\
+  ImageBase   : 0x{:08X}\n\
+  EntryPoint  : RVA 0x{:08X}\n\
+  SizeOfImage : {} bytes\n\
+  Subsystem   : {}\n",
+            self.info.dos.e_magic,
+            self.info.file.machine,
+            self.info.file.number_of_sections,
             self.image_base,
             self.entry_point_rva,
             self.memory.len(),
-            self.info.sections.len()
+            self.info.optional.subsystem
         );
         for sec in &self.info.sections {
             s.push_str(&format!(
