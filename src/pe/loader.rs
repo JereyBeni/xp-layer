@@ -123,9 +123,7 @@ impl LoadedImage {
                 for sym in &dll.symbols {
                     match sym {
                         ImportedSymbol::Name(n) => s.push_str(&format!("    - {}\n", n)),
-                        ImportedSymbol::Ordinal(o) => {
-                            s.push_str(&format!("    - ordinal {}\n", o))
-                        }
+                        ImportedSymbol::Ordinal(o) => s.push_str(&format!("    - ordinal {}\n", o)),
                     }
                 }
             }
