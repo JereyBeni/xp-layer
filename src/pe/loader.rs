@@ -141,12 +141,6 @@ fn read_u32(mem: &[u8], rva: usize) -> Option<u32> {
     Some(u32::from_le_bytes(bytes.try_into().ok()?))
 }
 
-fn read_u16(mem: &[u8], rva: usize) -> Option<u16> {
-    let end = rva.checked_add(2)?;
-    let bytes = mem.get(rva..end)?;
-    Some(u16::from_le_bytes(bytes.try_into().ok()?))
-}
-
 fn read_cstring(mem: &[u8], rva: usize) -> Option<String> {
     if rva >= mem.len() {
         return None;
