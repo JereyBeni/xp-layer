@@ -31,6 +31,14 @@ impl Profile {
         }
     }
 
+    fn short_label(self) -> &'static str {
+        match self {
+            Profile::WindowsXp => "Windows XP",
+            Profile::Windows2000 => "Windows 2000",
+            Profile::WindowsVista => "Windows Vista",
+        }
+    }
+
     fn is_available(self) -> bool {
         matches!(self, Profile::WindowsXp)
     }
@@ -44,7 +52,8 @@ fn load_icon() -> Option<egui::IconData> {
 
 fn main() -> eframe::Result<()> {
     let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([560.0, 640.0])
+        .with_inner_size([720.0, 560.0])
+        .with_min_inner_size([560.0, 420.0])
         .with_title("xp-layer - Windows XP Compatibility Layer");
 
     if let Some(icon) = load_icon() {
@@ -89,7 +98,9 @@ impl AppPicker {
             apps_dir,
             apps: Vec::new(),
             selected: None,
-            status: String::from("Place .exe files in the apps/ directory, then click Refresh."),
+            status: String::from(
+                "Welcome to xp-layer.\n\nPlace 32-bit Windows XP .exe files in the apps/ folder,\nthen click Refresh and select one to load.",
+            ),
             config,
             show_options: false,
             profile: Profile::WindowsXp,
@@ -127,7 +138,7 @@ impl AppPicker {
         if !self.apps_dir.exists() {
             let _ = fs::create_dir_all(&self.apps_dir);
             self.status = format!(
-                "Created {} directory. Place Windows XP .exe files here.",
+                "Created {} directory.\nPlace Windows XP .exe files here, then click Refresh.",
                 self.apps_dir.display()
             );
             return;
@@ -142,10 +153,14 @@ impl AppPicker {
                     }
                 }
                 self.apps.sort();
-                self.status = format!("Found {} application(s).", self.apps.len());
+                self.status = format!(
+                    "Found {} application(s) in {}.\nSelect one and click Run.",
+                    self.apps.len(),
+                    self.apps_dir.display()
+                );
             }
             Err(e) => {
-                self.status = format!("Failed to read apps directory: {}", e);
+                self.status = format!("Failed to read apps directory:\n{}", e);
             }
         }
     }
@@ -153,10 +168,8 @@ impl AppPicker {
     fn run_selected(&mut self) {
         if !self.profile.is_available() {
             self.status = format!(
-                "WARNING: The selected profile ({}) is not implemented yet.\n\
-Only the Windows XP profile is available at this time.\n\
-Please switch back to Windows XP in Options.",
-                self.profile.label()
+                "WARNING\n\nThe selected profile ({}) is not implemented yet.\nOnly Windows XP is available.\n\nSwitch back to Windows XP in Options.",
+                self.profile.short_label()
             );
             return;
         }
@@ -167,29 +180,22 @@ Please switch back to Windows XP in Options.",
         };
         let path = self.apps[idx].clone();
 
-        // 1. Load the PE
         let loaded = match LoadedImage::load(&path) {
             Ok(img) => img,
             Err(e) => {
-                self.status = format!("Failed to load PE:\n{}\n\n{}", path.display(), e);
+                self.status = format!("Failed to load PE\n\n{}\n\n{}", path.display(), e);
                 return;
             }
         };
 
-        // 2. Show memory status the guest would see
         let cfg = self.effective_config();
         let mem = kernel32::global_memory_status_ex(&cfg);
 
         let mut msg = format!(
-            "Loaded: {}\n\n{}\n\
-Profile: {}\n\
-GlobalMemoryStatusEx:\n\
-  TotalPhys : {} MB\n\
-  AvailPhys : {} MB\n\
-  MemoryLoad: {}%\n",
+            "Loaded: {}\n\n{}\nProfile: {}\n\nGlobalMemoryStatusEx:\n  TotalPhys : {} MB\n  AvailPhys : {} MB\n  MemoryLoad: {}%\n",
             path.display(),
             loaded.summary(),
-            self.profile.label(),
+            self.profile.short_label(),
             mem.total_phys / (1024 * 1024),
             mem.avail_phys / (1024 * 1024),
             mem.memory_load
@@ -197,13 +203,13 @@ GlobalMemoryStatusEx:\n\
 
         if self.debug_logging {
             msg.push_str(&format!(
-                "\n[Debug] Host memory: {} MB | Override active: {}\n",
+                "\n[Debug] Host: {} MB | Override: {}\n",
                 self.config.host_memory_mb, self.memory_override_enabled
             ));
         }
 
         msg.push_str(
-            "\nPE image is mapped in memory. CPU execution and further API translation are not yet implemented.",
+            "\nPE image mapped. CPU execution and full API translation are not yet implemented.",
         );
         self.status = msg;
     }
@@ -213,55 +219,94 @@ impl eframe::App for AppPicker {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(self.fullscreen));
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("xp-layer");
-            ui.label("Windows XP compatibility layer");
-            ui.separator();
+        // XP-ish blue title bar colours
+        let title_blue = egui::Color32::from_rgb(0, 0, 160);
+        let accent_magenta = egui::Color32::from_rgb(200, 0, 200);
 
-            ui.horizontal(|ui| {
-                if ui.button("Refresh").clicked() {
-                    self.refresh_apps();
-                }
-                if ui
-                    .button(if self.show_options {
-                        "Hide Options"
-                    } else {
-                        "Options"
-                    })
-                    .clicked()
-                {
-                    self.show_options = !self.show_options;
-                }
+        // Top header
+        egui::TopBottomPanel::top("header").exact_height(48.0).show(ctx, |ui| {
+            ui.painter().rect_filled(
+                ui.max_rect(),
+                0.0,
+                title_blue,
+            );
+            ui.horizontal_centered(|ui| {
+                ui.add_space(12.0);
+                ui.heading(
+                    egui::RichText::new("xp-layer")
+                        .color(egui::Color32::WHITE)
+                        .strong(),
+                );
+                ui.label(
+                    egui::RichText::new("  Windows XP compatibility layer")
+                        .color(egui::Color32::from_rgb(200, 200, 255))
+                        .small(),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.add_space(12.0);
+                    if ui
+                        .button(if self.show_options {
+                            "Hide Options"
+                        } else {
+                            "Options"
+                        })
+                        .clicked()
+                    {
+                        self.show_options = !self.show_options;
+                    }
+                    if ui.button("Refresh").clicked() {
+                        self.refresh_apps();
+                    }
+                });
             });
+        });
 
-            if self.show_options {
-                ui.add_space(6.0);
-                egui::Frame::group(ui.style()).show(ui, |ui| {
+        // Bottom status bar
+        egui::TopBottomPanel::bottom("footer").exact_height(28.0).show(ctx, |ui| {
+            ui.horizontal_centered(|ui| {
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new(format!(
+                        "Host: {} MB  |  Guest sees: {} MB  |  Profile: {}  |  Apps: {}",
+                        self.config.host_memory_mb,
+                        self.effective_reported_mb(),
+                        self.profile.short_label(),
+                        self.apps.len()
+                    ))
+                    .small()
+                    .color(egui::Color32::GRAY),
+                );
+            });
+        });
+
+        // Options side panel
+        if self.show_options {
+            egui::SidePanel::right("options")
+                .resizable(true)
+                .default_width(280.0)
+                .show(ctx, |ui| {
                     ui.heading("Options");
+                    ui.separator();
 
-                    ui.label("Compatibility profile:");
-                    ui.horizontal(|ui| {
-                        for p in [Profile::WindowsXp, Profile::Windows2000, Profile::WindowsVista] {
-                            ui.radio_value(&mut self.profile, p, p.label());
-                        }
-                    });
+                    ui.label("Compatibility profile");
+                    for p in [Profile::WindowsXp, Profile::Windows2000, Profile::WindowsVista] {
+                        ui.radio_value(&mut self.profile, p, p.short_label());
+                    }
                     if !self.profile.is_available() {
                         ui.colored_label(
                             egui::Color32::from_rgb(220, 80, 60),
-                            "WARNING: Windows 2000 and Windows Vista profiles are not implemented yet. Only Windows XP is available.",
+                            "Not implemented yet. Only Windows XP works.",
                         );
                     }
 
-                    ui.add_space(6.0);
+                    ui.add_space(8.0);
                     ui.separator();
+                    ui.add_space(4.0);
 
-                    ui.checkbox(
-                        &mut self.memory_override_enabled,
-                        "Override reported memory",
-                    );
+                    ui.checkbox(&mut self.memory_override_enabled, "Override reported memory");
                     if self.memory_override_enabled {
                         ui.horizontal(|ui| {
-                            ui.label("Reported memory (MB):");
+                            ui.label("MB:");
                             ui.add(
                                 egui::DragValue::new(&mut self.memory_override_mb)
                                     .range(64..=4096)
@@ -269,78 +314,126 @@ impl eframe::App for AppPicker {
                             );
                         });
                         ui.weak(format!(
-                            "Automatic mapping would report {} MB",
+                            "Auto would be {} MB",
                             reported_xp_memory_mb(self.config.host_memory_mb)
                         ));
                     }
 
-                    ui.add_space(4.0);
+                    ui.add_space(8.0);
+                    ui.label("Apps directory");
+                    ui.text_edit_singleline(&mut self.apps_dir_input);
+                    if ui.button("Apply path").clicked() {
+                        self.refresh_apps();
+                    }
 
-                    ui.label("Apps directory:");
-                    ui.horizontal(|ui| {
-                        ui.text_edit_singleline(&mut self.apps_dir_input);
-                        if ui.button("Apply").clicked() {
-                            self.refresh_apps();
-                        }
-                    });
-
-                    ui.add_space(4.0);
+                    ui.add_space(8.0);
                     ui.checkbox(&mut self.fullscreen, "Fullscreen");
-                    ui.checkbox(&mut self.debug_logging, "Debug logging (extra status detail)");
+                    ui.checkbox(&mut self.debug_logging, "Debug logging");
+
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.weak("Made for Linux and Windows.");
                 });
-                ui.add_space(6.0);
-            }
+        }
 
-            ui.separator();
-            ui.label("Applications:");
+        // Main content: apps list + status
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.add_space(4.0);
 
-            egui::ScrollArea::vertical()
-                .max_height(140.0)
-                .show(ui, |ui| {
-                    if self.apps.is_empty() {
-                        ui.label("(no .exe files found)");
+            ui.columns(2, |cols| {
+                // Left: application list
+                cols[0].group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.heading("Applications");
+                        ui.label(
+                            egui::RichText::new(format!("({})", self.apps.len()))
+                                .color(egui::Color32::GRAY),
+                        );
+                    });
+                    ui.separator();
+
+                    egui::ScrollArea::vertical()
+                        .id_salt("app_list")
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            if self.apps.is_empty() {
+                                ui.label(
+                                    egui::RichText::new("(no .exe files found)")
+                                        .italics()
+                                        .color(egui::Color32::GRAY),
+                                );
+                                ui.add_space(8.0);
+                                ui.label("Drop 32-bit XP executables into the apps/ folder.");
+                            } else {
+                                for (i, path) in self.apps.iter().enumerate() {
+                                    let name = path
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("<unknown>");
+                                    let selected = self.selected == Some(i);
+                                    let response = ui.selectable_label(selected, name);
+                                    if response.clicked() {
+                                        self.selected = Some(i);
+                                    }
+                                    if response.double_clicked() {
+                                        self.selected = Some(i);
+                                        self.run_selected();
+                                    }
+                                }
+                            }
+                        });
+
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+
+                    let can_run = self.selected.is_some();
+                    let run_btn = egui::Button::new(
+                        egui::RichText::new("  Run selected application  ").strong(),
+                    )
+                    .fill(if can_run {
+                        egui::Color32::from_rgb(0, 90, 180)
                     } else {
-                        for (i, path) in self.apps.iter().enumerate() {
+                        egui::Color32::DARK_GRAY
+                    })
+                    .min_size(egui::vec2(0.0, 32.0));
+
+                    if ui.add_enabled(can_run, run_btn).clicked() {
+                        self.run_selected();
+                    }
+
+                    if let Some(idx) = self.selected {
+                        if let Some(path) = self.apps.get(idx) {
                             let name = path
                                 .file_name()
                                 .and_then(|n| n.to_str())
-                                .unwrap_or("<unknown>");
-                            let selected = self.selected == Some(i);
-                            if ui.selectable_label(selected, name).clicked() {
-                                self.selected = Some(i);
-                            }
+                                .unwrap_or("?");
+                            ui.label(
+                                egui::RichText::new(format!("Selected: {}", name))
+                                    .small()
+                                    .color(accent_magenta),
+                            );
                         }
                     }
                 });
 
-            ui.add_space(8.0);
-
-            ui.horizontal(|ui| {
-                let can_run = self.selected.is_some();
-                if ui
-                    .add_enabled(can_run, egui::Button::new("Run selected application"))
-                    .clicked()
-                {
-                    self.run_selected();
-                }
-            });
-
-            ui.add_space(10.0);
-            ui.separator();
-            ui.label("Status:");
-            egui::ScrollArea::vertical()
-                .max_height(180.0)
-                .show(ui, |ui| {
-                    ui.label(&self.status);
+                // Right: status / PE output
+                cols[1].group(|ui| {
+                    ui.heading("Status");
+                    ui.separator();
+                    egui::ScrollArea::vertical()
+                        .id_salt("status_view")
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(&self.status).monospace().size(12.5),
+                                )
+                                .wrap(),
+                            );
+                        });
                 });
-
-            ui.add_space(6.0);
-            ui.weak(format!(
-                "Host: {} MB  |  Reported to guest: {} MB  |  Profile: {}",
-                self.config.host_memory_mb,
-                self.effective_reported_mb(),
-                self.profile.label()
-            ));
+            });
         });
     }
 }
