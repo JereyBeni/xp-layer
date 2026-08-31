@@ -12,6 +12,7 @@ readme = "README.md"
 eframe = "0.29"
 egui = "0.29"
 sysinfo = "0.32"
+raw-cpuid = "11"
 
 [profile.release]
 lto = true
