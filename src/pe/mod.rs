@@ -3,5 +3,4 @@
 mod header;
 mod loader;
 
-pub use header::*;
-pub use loader::*;
+pub use loader::LoadedImage;
