@@ -23,14 +23,6 @@ enum Profile {
 }
 
 impl Profile {
-    fn label(self) -> &'static str {
-        match self {
-            Profile::WindowsXp => "Windows XP",
-            Profile::Windows2000 => "Windows 2000 (not yet implemented)",
-            Profile::WindowsVista => "Windows Vista (not yet implemented)",
-        }
-    }
-
     fn short_label(self) -> &'static str {
         match self {
             Profile::WindowsXp => "Windows XP",
@@ -347,6 +339,8 @@ impl eframe::App for AppPicker {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(4.0);
 
+            let mut run_after_list = false;
+
             ui.columns(2, |cols| {
                 // Left: application list
                 cols[0].group(|ui| {
@@ -384,7 +378,7 @@ impl eframe::App for AppPicker {
                                     }
                                     if response.double_clicked() {
                                         self.selected = Some(i);
-                                        self.run_selected();
+                                        run_after_list = true;
                                     }
                                 }
                             }
@@ -406,7 +400,7 @@ impl eframe::App for AppPicker {
                     .min_size(egui::vec2(0.0, 32.0));
 
                     if ui.add_enabled(can_run, run_btn).clicked() {
-                        self.run_selected();
+                        run_after_list = true;
                     }
 
                     if let Some(idx) = self.selected {
@@ -438,6 +432,10 @@ impl eframe::App for AppPicker {
                         });
                 });
             });
+
+            if run_after_list {
+                self.run_selected();
+            }
         });
     }
 }
